@@ -23,7 +23,6 @@
     <span class="file-badge" id="filenameBadge"></span>
     <button class="btn" onclick="document.getElementById('fileInput').click()">📂 Open PDF</button>
     <button class="btn" id="importJsonBtn" onclick="document.getElementById('jsonImportInput').click()" disabled title="Import existing CMS JSON to preview coordinates">📥 Import JSON</button>
-    <button class="btn btn-primary" id="exportBtn" onclick="copyExport()" disabled>⬆ Copy Export</button>
   </div>
 </header>
 
@@ -219,18 +218,7 @@
 
   <div class="exp-sec">
     <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px;">Export</div>
-
-    <div class="fmt-tabs">
-      <div class="fmt-tab active" onclick="setFormat('cms')" id="fmt-cms">CMS JSON</div>
-      <div class="fmt-tab" onclick="setFormat('csv')" id="fmt-csv">CSV</div>
-      <div class="fmt-tab" onclick="setFormat('table')" id="fmt-table">TABLE</div>
-    </div>
-    <div class="exp-preview" id="expPreview">// Draw boxes to see coordinates</div>
-    <div class="exp-btns">
-      <button class="btn btn-primary" style="flex:1;justify-content:center;" id="copyBtn" onclick="copyExport()" disabled>Copy</button>
-      <button class="btn" style="flex:1;justify-content:center;" id="jsonDlBtn" onclick="downloadCMSJson()" disabled title="Download CMS JSON file">⬇ Download JSON</button>
-      <button class="btn" style="flex:1;justify-content:center;" id="pdfBtn" onclick="exportPDF()" disabled title="Export as PDF table">📄 PDF</button>
-    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" id="jsonDlBtn" onclick="downloadCMSJson()" disabled title="Download the CMS admin import file">⬇️ Download CMS JSON</button>
   </div>
 
 </div>

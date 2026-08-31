@@ -21,7 +21,7 @@ let cmsLogoDataUrl=null, cmsLogoAspect=1000/275;
 
 // ── STATE ──
 let pdfDoc=null, currentPage=1, totalPages=0, scale=1.5;
-let allBoxes=[], boxCounter=0, exportFormat='cms';
+let allBoxes=[], boxCounter=0;
 let pageOriginalSizes={};
 
 // Signee colour-code — CMS CI core + supporting palette (all readable on white)
@@ -724,13 +724,8 @@ function updatePanel(){
   const empty=document.getElementById('emptyState');
   document.getElementById('countBadge').textContent=allBoxes.length;
   const hasBoxes=allBoxes.length>0;
-  document.getElementById('exportBtn').disabled=!hasBoxes;
-  document.getElementById('copyBtn').disabled=!hasBoxes;
-  document.getElementById('pdfBtn').disabled=!hasBoxes;
-  const jb=document.getElementById('jsonDlBtn');
-  jb.disabled=!hasBoxes;
-  jb.style.display=(exportFormat==='cms')?'inline-flex':'none';
-  if(!hasBoxes){list.style.display='none';empty.style.display='flex';document.getElementById('expPreview').textContent='// Draw boxes to see coordinates';return;}
+  document.getElementById('jsonDlBtn').disabled=!hasBoxes;
+  if(!hasBoxes){list.style.display='none';empty.style.display='flex';return;}
   list.style.display='block'; empty.style.display='none';
   const sorted=[...allBoxes].sort((a,b)=>a.page!==b.page?a.page-b.page:a.id-b.id);
   list.innerHTML=sorted.map(box=>{
@@ -966,14 +961,6 @@ function deleteBox(id){allBoxes=allBoxes.filter(b=>b.id!==id);if(selectedId===id
 function clearAll(){if(!allBoxes.length)return;if(!confirm(`Remove all ${allBoxes.length} box(es)?`))return;allBoxes=[];selectedId=null;drawAllBoxes();updatePanel();renderSignees();}
 
 // ── EXPORT ──
-function setFormat(f){
-  exportFormat=f;
-  document.querySelectorAll('.fmt-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('fmt-'+f).classList.add('active');
-  // Show download JSON button only for CMS JSON
-  document.getElementById('jsonDlBtn').style.display=(f==='cms'||f==='json')?'inline-flex':'none';
-  updateExportPreview();
-}
 // Returns rows sorted & grouped by signee, then by page within each signee
 function getGroupedRows(){
   // Get signees that actually have boxes, in signee order
@@ -1016,44 +1003,9 @@ function buildCMSJson(){
   };
 }
 
-function getExportData(){
-  const data=getGroupedRows();
-  if(exportFormat==='cms'){
-    return JSON.stringify(buildCMSJson(),null,2);
-  }
-  if(exportFormat==='csv'){
-    const lines=['name,signee,page,x,y,width,height'];
-    const usedSigneeIds=[...new Set(signees.filter(s=>allBoxes.some(b=>b.signeeId===s.id)).map(s=>s.id))];
-    usedSigneeIds.forEach((sid,si)=>{
-      if(si>0) lines.push(''); // blank line between signee groups
-      const s=getSignee(sid);
-      lines.push(`# --- ${s?.name||''} ---`);
-      allBoxes.filter(b=>b.signeeId===sid)
-        .sort((a,b)=>a.page!==b.page?a.page-b.page:a.id-b.id)
-        .forEach(b=>lines.push(`${b.name},${s?.name||''},${b.page},${b.x},${b.y},${b.w},${b.h}`));
-    });
-    return lines.join('\n');
-  }
-  if(exportFormat==='table'){
-    const p=(s,n)=>String(s).padEnd(n);
-    const h=`${p('NAME',22)} ${p('PAGE',5)} ${p('X',7)} ${p('Y',7)} ${p('W',7)} H`;
-    const sep='-'.repeat(h.length);
-    const lines=[];
-    const usedSigneeIds=[...new Set(signees.filter(s=>allBoxes.some(b=>b.signeeId===s.id)).map(s=>s.id))];
-    usedSigneeIds.forEach((sid,si)=>{
-      if(si>0) lines.push('');
-      const s=getSignee(sid);
-      lines.push(`[ ${s?.name||''} ]`);
-      lines.push(h); lines.push(sep);
-      allBoxes.filter(b=>b.signeeId===sid)
-        .sort((a,b)=>a.page!==b.page?a.page-b.page:a.id-b.id)
-        .forEach(b=>lines.push(`${p(b.name,22)} ${p(b.page,5)} ${p(b.x,7)} ${p(b.y,7)} ${p(b.w,7)} ${b.h}`));
-    });
-    return lines.join('\n');
-  }
-}
-function updateExportPreview(){if(allBoxes.length)document.getElementById('expPreview').textContent=getExportData();}
-function copyExport(){if(!allBoxes.length)return;navigator.clipboard.writeText(getExportData()).then(()=>showToast('Copied to clipboard'));}
+// Export is CMS JSON download only. The old on-screen preview was removed;
+// this stays as a no-op so the many callers don't need touching.
+function updateExportPreview(){}
 
 function downloadCMSJson(){
   if(!allBoxes.length) return;

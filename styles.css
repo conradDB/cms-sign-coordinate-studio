@@ -112,7 +112,7 @@ body{
 
 /* Numeric / tabular contexts — Roboto with lined figures */
 .file-badge,.page-ctr,.z-lbl,.s-count,.pg-badge,.cf-lbl,.cf-inp,
-.exp-preview,.live-cur,.modal-signee-meta,.modal-field-pg,.kbd,
+.live-cur,.modal-signee-meta,.modal-field-pg,.kbd,
 input[type="number"]{
   font-variant-numeric:tabular-nums;
   font-feature-settings:"tnum" 1;
@@ -482,20 +482,6 @@ select.inp{cursor:pointer;}
 
 /* export */
 .exp-sec{border-top:1px solid var(--glass-edge);padding:12px;flex-shrink:0;}
-.fmt-tabs{display:flex;gap:4px;margin-bottom:9px;}
-.fmt-tab{
-  flex:1;padding:6px;background:#FFFFFF;border:1px solid var(--glass-edge);
-  border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--ink-3);
-  cursor:pointer;transition:all .16s var(--ease-glass);text-align:center;
-}
-.fmt-tab:hover{color:var(--ink-1);border-color:var(--ink-4);}
-.fmt-tab.active{border-color:var(--cms-blue);color:#fff;background:var(--cms-blue);}
-.exp-preview{
-  background:var(--void-2);border:1px solid var(--glass-edge);border-radius:var(--radius-sm);padding:10px;
-  font-family:var(--font-mono);font-size:10px;color:var(--ink-2);line-height:1.7;max-height:110px;
-  overflow-y:auto;white-space:pre;margin-bottom:9px;
-}
-.exp-btns{display:flex;gap:5px;}
 
 /* live cursor */
 .live-cur{
