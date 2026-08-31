@@ -23,6 +23,7 @@ let cmsLogoDataUrl=null, cmsLogoAspect=1000/275;
 let pdfDoc=null, currentPage=1, totalPages=0, scale=1.5;
 let allBoxes=[], boxCounter=0;
 let pageOriginalSizes={};
+let pdfBaseName='';   // uploaded PDF's name without extension — used for the export filename
 
 // Signee colour-code — CMS CI core + supporting palette (all readable on white)
 const COLORS=['#31459C','#00AEED','#40B100','#FF532F','#800080','#195869','#DF0020','#585858'];
@@ -175,6 +176,7 @@ function setTool(t){
 async function loadPDF(inp){const f=inp.files[0];if(!f)return;loadPDFFromFile(f);inp.value='';}
 async function loadPDFFromFile(file){
   document.getElementById('filenameBadge').textContent=file.name;
+  pdfBaseName=file.name.replace(/\.pdf$/i,'').trim();
   allBoxes=[];boxCounter=0;pageOriginalSizes={};updatePanel();
   const buf=await file.arrayBuffer();
   pdfDoc=await pdfjsLib.getDocument({data:buf}).promise;
@@ -1014,7 +1016,8 @@ function downloadCMSJson(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
-  a.download=`SignFields-${payload.DocumentID}.json`;
+  const safeName=(pdfBaseName||'').replace(/[\\/:*?"<>|]/g,'').trim();
+  a.download=(safeName?`${safeName} - Coordinates`:`SignFields-${payload.DocumentID}`)+'.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
