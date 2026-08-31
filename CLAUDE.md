@@ -15,13 +15,16 @@ no bundler. Just three files loaded directly by the browser:
 | File          | Contents                                                              |
 |---------------|-----------------------------------------------------------------------|
 | `index.html`  | Markup + DOM structure. Loads `styles.css` and `app.js`.              |
-| `styles.css`  | All styling. The "liquid glass" design system (see Design below).     |
+| `styles.css`  | All styling. CMS corporate-identity design system (see Design below). |
 | `app.js`      | All application logic. ~1400 lines of vanilla JS, no modules.         |
+| `assets/`     | CMS logo artwork + self-hosted Roboto TTFs.                           |
 
 External libraries are loaded from CDN in `index.html` (not bundled):
 - **pdf.js** (`cdnjs`) — renders PDF pages to a canvas
 - **jsPDF** (`cdnjs`) — generates the PDF coordinate-report export
-- **Google Fonts** — Space Grotesk (display), Inter (body), JetBrains Mono (coordinates)
+
+Fonts are **self-hosted** from `assets/fonts/` (Roboto Regular/Medium/Bold/Italic) via `@font-face` —
+no external font CDN.
 
 ### Why no framework
 Portability is the point. A CMS staffer can double-click `index.html` and it runs. It can be dropped
@@ -95,19 +98,25 @@ the top border, a bezier-drawn handwritten scrawl, and a "Powered by ● CMS Sig
 the bottom border (white break in the line behind both legends, fieldset-style).
 
 ## Design system (styles.css)
-"Liquid glass" — frosted translucent panels on a lit obsidian field. Key ideas:
-- `.glass` primitive: `backdrop-filter: blur+saturate`, specular top-edge highlight (`::after`), layered shadow
-- Body has a noise-grain overlay (`body::before`) so glass isn't flat
-- Accent system: azure `#3d7eff` + mint `#00e5b0`; CMS red `#c0392b` reserved for logo/danger
-- Signee palette: 8 glowing colours (`--s1..--s8`), dots cast light via `box-shadow`
-- Fonts: Space Grotesk / Inter / JetBrains Mono
-- CSS custom properties define everything — change tokens in `:root`, not individual rules
+**CMS Systems corporate identity** — per the "CMS Systems Visual Guide (CI)". Build from white.
+- **Palette:** Blue `#31459C` (structure, headings, primary buttons), Turquoise `#00AEED` (accents,
+  selection, focus rings), Red `#FD4545` (danger / alerts only — used sparingly), text `#2E2E2E` /
+  `#585858`, borders `#D8D8D8` / `#B2B2B2`, surfaces white / `#F4F6F9` / `#EEF1F6`.
+- `.glass` primitive: now just a clean white card (border + soft shadow). The class name and the
+  `--glass-*` / `--ease-glass` token names are retained so markup didn't need to change.
+- Signee colour-code: 8 CI-palette colours (`--s1..--s8`) — core + supporting palette, all legible
+  on white. Mirrored by `COLORS` / `RGBS` in `app.js`.
+- Fonts: **Roboto** everywhere (self-hosted). Coordinate/number fields use Roboto with
+  `font-variant-numeric: tabular-nums` (the CI names no monospace face).
+- Logo: approved artwork only — `assets/cms-logo.png` (the "CMS eco" lock-up), never redrawn or
+  set in a font. The PDF export embeds the same file.
+- CSS custom properties define everything — change tokens in `:root`, not individual rules.
 
 ## Conventions & gotchas
 - **After editing coordinates or boxes, always call `drawAllBoxes()`** to repaint.
 - **Retina**: canvases are sized `cssPx * devicePixelRatio` and the context is scaled; don't assume 1:1.
 - **Preview mode suppresses all editing chrome** (labels, handles, selection outlines) at every zoom level.
-- **`select` dropdowns**: native option lists are OS-rendered and can't be fully glass-styled — this is a known browser limitation, not a bug.
+- **`select` dropdowns**: native option lists are OS-rendered and can't be fully custom-styled — this is a known browser limitation, not a bug.
 - **Element IDs are the integration contract** between `app.js` and `index.html` — if you rename one, grep both files.
 - When adding a new field type, update: the type table above, the card `<select>` in `updatePanel()`, and the preview renderer.
 
