@@ -1,13 +1,40 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const {jsPDF} = window.jspdf;
 
+// CMS logo (approved artwork) preloaded as a data URL for the PDF export header.
+// Downscaled to ~360px wide so the exported report stays lightweight.
+let cmsLogoDataUrl=null, cmsLogoAspect=1000/275;
+(function preloadCmsLogo(){
+  const img=new Image();
+  img.onload=()=>{
+    cmsLogoAspect=img.naturalWidth/img.naturalHeight;
+    try{
+      const w=360, h=Math.round(w/cmsLogoAspect);
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cmsLogoDataUrl=cv.toDataURL('image/png');
+    }catch(e){/* header falls back to a text-only title — never a redrawn logo */}
+  };
+  img.onerror=()=>{/* text-only header fallback */};
+  img.src='assets/cms-logo.png';
+})();
+
 // ── STATE ──
 let pdfDoc=null, currentPage=1, totalPages=0, scale=1.5;
 let allBoxes=[], boxCounter=0, exportFormat='cms';
 let pageOriginalSizes={};
 
-const COLORS=['#3d7eff','#ff5c7a','#00e5b0','#ffb545','#b47dff','#ff8c42','#4dd9e8','#ff6ec7'];
-const RGBS  =['61,126,255','255,92,122','0,229,176','255,181,69','180,125,255','255,140,66','77,217,232','255,110,199'];
+// Signee colour-code — CMS CI core + supporting palette (all readable on white)
+const COLORS=['#31459C','#00AEED','#40B100','#FF532F','#800080','#195869','#DF0020','#585858'];
+const RGBS  =['49,69,156','0,174,237','64,177,0','255,83,47','128,0,128','25,88,105','223,0,32','88,88,88'];
+
+// Label text colour that stays legible on top of a given signee colour
+function labelInk(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  // relative luminance (sRGB approx)
+  const L=(0.299*r+0.587*g+0.114*b)/255;
+  return L>0.62 ? '#2E2E2E' : '#ffffff';
+}
 
 let signees=[
   {id:1,name:'Prospect Owner',color:COLORS[0],rgb:RGBS[0],order:1,type:1},
@@ -127,9 +154,9 @@ function removeSignee(id){
 function getSignee(id){return signees.find(s=>s.id===id);}
 function updateBadge(){
   const s=getSignee(activeSigneeId);
-  document.getElementById('abDot').style.background=s?.color||'#555';
+  document.getElementById('abDot').style.background=s?.color||'#B2B2B2';
   document.getElementById('abName').textContent=s?.name||'No signee';
-  document.getElementById('hDot').style.background=s?.color||'#555';
+  document.getElementById('hDot').style.background=s?.color||'#B2B2B2';
 }
 
 // ── TOOLS ──
@@ -204,7 +231,7 @@ function drawAllBoxes(){
   octx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
   allBoxes.filter(b=>b.page===currentPage).forEach(box=>{
     const s=getSignee(box.signeeId);
-    const color=s?.color||'#3d7eff';
+    const color=s?.color||'#31459C';
     const bx=box.x*scale, by=box.y*scale, bw=box.w*scale, bh=box.h*scale;
     const sel=box.id===selectedId;
     const multi=multiSelected.has(box.id);
@@ -224,7 +251,7 @@ function drawAllBoxes(){
     } else {
       octx.fillStyle=hex2rgba(color,multi?.25:sel?.2:.1);
       octx.fillRect(bx,by,bw,bh);
-      octx.strokeStyle=multi?'#fff':color;
+      octx.strokeStyle=multi?'#31459C':color;
       octx.lineWidth=multi?2.5:sel?2.5:1.5;
       octx.setLineDash(multi?[5,3]:sel?[6,3]:[]);
       octx.strokeRect(bx,by,bw,bh);
@@ -239,12 +266,12 @@ function drawAllBoxes(){
       }
       octx.setLineDash([]);
       // Only draw label if the box is tall enough (>18px rendered) and wide enough to fit text
-      octx.font='bold 10px Inter,sans-serif';
+      octx.font='700 10px Roboto, Arial, sans-serif';
       const lbl=box.name;
       const tw=octx.measureText(lbl).width+8;
       if(bh>18 && bw>tw){
         octx.fillStyle=color; octx.fillRect(bx,by,tw,16);
-        octx.fillStyle='#fff'; octx.fillText(lbl,bx+4,by+11);
+        octx.fillStyle=labelInk(color); octx.fillText(lbl,bx+4,by+11);
       }
     }
 
@@ -310,9 +337,9 @@ function drawAllBoxes(){
   if(isMarquee){
     const rx=Math.min(mqX0,mqX1),ry=Math.min(mqY0,mqY1);
     const rw=Math.abs(mqX1-mqX0),rh=Math.abs(mqY1-mqY0);
-    octx.strokeStyle='rgba(255,255,255,0.8)'; octx.lineWidth=1.5; octx.setLineDash([5,3]);
+    octx.strokeStyle='rgba(49,69,156,0.9)'; octx.lineWidth=1.5; octx.setLineDash([5,3]);
     octx.strokeRect(rx,ry,rw,rh);
-    octx.fillStyle='rgba(61,126,255,0.12)'; octx.fillRect(rx,ry,rw,rh);
+    octx.fillStyle='rgba(0,174,237,0.12)'; octx.fillRect(rx,ry,rw,rh);
     octx.setLineDash([]);
   }
 }
@@ -434,12 +461,12 @@ drawCanvas.addEventListener('mousemove',e=>{
   dctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
   const rw=cx-startX, rh=cy-startY;
   const s=getSignee(activeSigneeId);
-  const color=s?.color||'#3d7eff';
+  const color=s?.color||'#31459C';
   dctx.strokeStyle=color; dctx.lineWidth=2; dctx.setLineDash([6,3]);
   dctx.strokeRect(startX,startY,rw,rh);
   dctx.fillStyle=hex2rgba(color,.08); dctx.fillRect(startX,startY,rw,rh);
   dctx.setLineDash([]);
-  dctx.fillStyle=hex2rgba(color,.9); dctx.font='bold 10px IBM Plex Mono,monospace';
+  dctx.fillStyle=hex2rgba(color,.9); dctx.font='700 10px Roboto, Arial, sans-serif';
   const wl=Math.abs(Math.round(rw/scale)),hl=Math.abs(Math.round(rh/scale));
   dctx.fillText(`${wl}×${hl}`,startX+4,startY+(rh>16?rh-4:-5));
 });
@@ -708,7 +735,7 @@ function updatePanel(){
   const sorted=[...allBoxes].sort((a,b)=>a.page!==b.page?a.page-b.page:a.id-b.id);
   list.innerHTML=sorted.map(box=>{
     const s=getSignee(box.signeeId);
-    const color=s?.color||'#3d7eff';
+    const color=s?.color||'#31459C';
     const sel=box.id===selectedId;
     const signeeOptions=signees.map(sig=>`<option value="${sig.id}" ${sig.id===box.signeeId?'selected':''}>${sig.name}</option>`).join('');
     return`<div class="coord-card ${sel?'selected':''}" id="card-${box.id}" style="--sc:${color}" onclick="selCard(${box.id})">
@@ -823,7 +850,7 @@ function drawSignatureScrawl(c,x,y,w,h){
   c.translate(cx,cy);
   c.lineWidth=Math.max(1.5,h*0.07);
   c.lineCap='round'; c.lineJoin='round';
-  c.strokeStyle='#111';
+  c.strokeStyle='#2E2E2E';
   c.beginPath();
   c.moveTo(-s*0.30,s*0.12);
   c.bezierCurveTo(-s*0.27,-s*0.18,-s*0.13,-s*0.22,-s*0.11,-s*0.02);
@@ -848,7 +875,7 @@ function drawSignatureBlock(c,bx,by,bw,bh){
   c.fillStyle='#ffffff';
   c.fill();
   c.lineWidth=Math.max(1, scale);
-  c.strokeStyle='#3a3f4a';
+  c.strokeStyle='#B2B2B2';
   c.stroke();
 
   // "Signature" legend sitting on the top border (fieldset style)
@@ -859,7 +886,7 @@ function drawSignatureBlock(c,bx,by,bw,bh){
   const lx=bx+10*scale;
   c.fillStyle='#ffffff';
   c.fillRect(lx-4*scale, by-labelFont*0.6, lw+8*scale, labelFont*1.2);
-  c.fillStyle='#2f479c';
+  c.fillStyle='#31459C';
   c.textAlign='left';
   c.textBaseline='middle';
   c.fillText(label,lx,by+0.5);
@@ -882,15 +909,15 @@ function drawSignatureBlock(c,bx,by,bw,bh){
   c.fillStyle='#ffffff';
   c.fillRect(pxr-totalW-4*scale, byLine-pf*0.72, totalW+6*scale, pf*1.44);
   // Draw right-to-left: "CMS Sign" → badge dot → "Powered by"
-  c.fillStyle='#2f479c';
+  c.fillStyle='#31459C';
   c.fillText('CMS Sign',pxr,byLine);
   const dotX=pxr-cmsW-pf*0.55-dotR, dotY=byLine;
   c.beginPath();
   c.arc(dotX,dotY,dotR,0,Math.PI*2);
-  c.fillStyle='#ec4747'; c.fill();
+  c.fillStyle='#FD4545'; c.fill();
   c.lineWidth=Math.max(0.5,0.5*scale);
-  c.strokeStyle='#2f479c'; c.stroke();
-  c.fillStyle='#8a8f99';
+  c.strokeStyle='#31459C'; c.stroke();
+  c.fillStyle='#585858';
   c.fillText('Powered by ',dotX-dotR-pf*0.15,byLine);
   c.restore();
 }
@@ -1052,21 +1079,25 @@ function exportPDF(){
   const margin=36;
 
   function drawPageHeader(){
-    doc.setFillColor(31,42,74);
-    doc.rect(0,0,pageW,46,'F');
-    doc.setFillColor(61,126,255); doc.circle(30,23,18,'F');
-    doc.setFillColor(160,160,160); doc.circle(30,23,14,'F');
-    doc.setFillColor(192,57,43); doc.circle(30,23,10,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(11); doc.setFont('helvetica','bold');
-    doc.text('1',30,27,{align:'center'});
-    doc.setFontSize(22); doc.text('CMS',58,30);
-    doc.setFontSize(11); doc.setFont('helvetica','normal');
-    doc.text('CMS Sign — Coordinate Export',58,42);
-    doc.setFontSize(9);
+    // Build from white: white band, CMS Blue title, one hairline rule, blue accent edge
+    doc.setFillColor(255,255,255);
+    doc.rect(0,0,pageW,52,'F');
+    // Approved logo artwork, top left (never a redrawn mark)
+    if(cmsLogoDataUrl){
+      const lh=22, lw=lh*cmsLogoAspect;
+      doc.addImage(cmsLogoDataUrl,'PNG',margin,15,lw,lh);
+    }
+    doc.setTextColor(49,69,156);
+    doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text('CMS Sign — Coordinate Export',pageW/2,28,{align:'center'});
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.setTextColor(88,88,88);
     const now=new Date().toLocaleDateString('en-ZA',{year:'numeric',month:'long',day:'numeric'});
-    doc.text(now,pageW-margin,30,{align:'right'});
-    doc.text(`${allBoxes.length} signature box(es)`,pageW-margin,42,{align:'right'});
+    doc.text(now,pageW-margin,22,{align:'right'});
+    doc.text(`${allBoxes.length} signature box(es)`,pageW-margin,34,{align:'right'});
+    doc.setDrawColor(216,216,216); doc.setLineWidth(.5);
+    doc.line(margin,50,pageW-margin,50);
+    doc.setFillColor(49,69,156); doc.rect(0,0,pageW,3,'F');
   }
 
   drawPageHeader();
@@ -1083,7 +1114,7 @@ function exportPDF(){
   const rowH=18;
 
   function drawTableHeader(color){
-    const rgb=color||[61,126,255];
+    const rgb=color||[49,69,156];
     doc.setFillColor(...rgb);
     doc.rect(margin,y,pageW-margin*2,rowH,'F');
     doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont('helvetica','bold');
@@ -1114,7 +1145,7 @@ function exportPDF(){
     doc.setFontSize(11); doc.setFont('helvetica','bold');
     doc.text(sig.name,margin+12,y+15);
     doc.setFontSize(9); doc.setFont('helvetica','normal');
-    doc.setTextColor(100,110,130);
+    doc.setTextColor(88,88,88);
     doc.text(`${sigBoxes.length} box(es)`,pageW-margin,y+15,{align:'right'});
     y+=26;
 
@@ -1125,17 +1156,17 @@ function exportPDF(){
     sigBoxes.forEach((box,idx)=>{
       if(y>pageH-40){doc.addPage();drawPageHeader();y=62;drawTableHeader(rgb);}
       const even=idx%2===0;
-      doc.setFillColor(even?248:255,even?250:255,even?255:255);
+      doc.setFillColor(even?247:255,even?248:255,even?250:255);
       doc.rect(margin,y,pageW-margin*2,rowH,'F');
       // Colour stripe
       doc.setFillColor(...rgb);
       doc.rect(margin,y,4,rowH,'F');
 
-      doc.setTextColor(40,40,40); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.setTextColor(46,46,46); doc.setFontSize(9); doc.setFont('helvetica','normal');
       const vals=[box.name,`Page ${box.page}`,String(box.x),String(box.y),String(box.w),String(box.h)];
       let vx=margin+8;
       cols.forEach((c,i)=>{doc.text(String(vals[i]||''),vx,y+12);vx+=c.w;});
-      doc.setDrawColor(210,220,235); doc.setLineWidth(.3);
+      doc.setDrawColor(216,216,216); doc.setLineWidth(.3);
       doc.line(margin,y+rowH,margin+pageW-margin*2,y+rowH);
       y+=rowH;
     });
@@ -1146,7 +1177,7 @@ function exportPDF(){
   const totalPg=doc.internal.getNumberOfPages();
   for(let i=1;i<=totalPg;i++){
     doc.setPage(i);
-    doc.setFontSize(8); doc.setTextColor(150,160,175); doc.setFont('helvetica','normal');
+    doc.setFontSize(8); doc.setTextColor(88,88,88); doc.setFont('helvetica','normal');
     doc.text(`CMS Sign — Coordinate Export  |  Page ${i} of ${totalPg}`,pageW/2,pageH-14,{align:'center'});
   }
 
@@ -1182,7 +1213,7 @@ function showImportModal(data){
   const existing=document.getElementById('importModal');
   if(existing) existing.remove();
 
-  const signeeColors=["#3d7eff","#ff5c7a","#00e5b0","#ffb545","#b47dff","#ff8c42","#4dd9e8","#ff6ec7"];
+  const signeeColors=COLORS;
   const totalFields=data.DocSignees.reduce((s,sg)=>s+(sg.DocSignFields?.length||0),0);
   const hasExisting=allBoxes.length>0;
 
@@ -1241,8 +1272,8 @@ function closeImportModal(){
 function applyImport(){
   if(!importPreviewData) return;
   const data=importPreviewData;
-  const signeeColors=["#3d7eff","#ff5c7a","#00e5b0","#ffb545","#b47dff","#ff8c42","#4dd9e8","#ff6ec7"];
-  const signeeRGBs=["61,126,255","255,92,122","0,229,176","255,181,69","180,125,255","255,140,66","77,217,232","255,110,199"];
+  const signeeColors=COLORS;
+  const signeeRGBs=RGBS;
 
   // Clear existing boxes AND signees — rebuild entirely from JSON
   allBoxes=[];

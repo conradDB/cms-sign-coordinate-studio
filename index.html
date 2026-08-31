@@ -4,10 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CMS Sign — Coordinate Studio</title>
+<link rel="icon" type="image/png" href="assets/cms-logo-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,66 +15,9 @@
 <!-- ── HEADER ── -->
 <header>
   <div class="brand">
-    <!-- CMS eco + wi logo — crisp vector recreation, tuned for dark backgrounds -->
-    <svg class="logo-svg" viewBox="0 0 208 64" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="wiRing" x1="20%" y1="0%" x2="80%" y2="100%">
-          <stop offset="0%"  stop-color="#ff6ec7"/>
-          <stop offset="35%" stop-color="#c95fd1"/>
-          <stop offset="70%" stop-color="#7a6bd6"/>
-          <stop offset="100%" stop-color="#4a67c4"/>
-        </linearGradient>
-        <linearGradient id="wiText" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#c95fd1"/>
-          <stop offset="100%" stop-color="#7a6bd6"/>
-        </linearGradient>
-        <filter id="wiGlow" x="-150%" y="-150%" width="400%" height="400%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b1"/>
-          <feColorMatrix in="b1" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.5 0" result="g1"/>
-          <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b2"/>
-          <feColorMatrix in="b2" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.0 0" result="g2"/>
-          <feGaussianBlur in="SourceGraphic" stdDeviation="13" result="b3"/>
-          <feColorMatrix in="b3" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.5 0" result="g3"/>
-          <feMerge>
-            <feMergeNode in="g3"/><feMergeNode in="g2"/><feMergeNode in="g1"/><feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-
-      <!-- ══ Badge: blue arc + arrowhead wrapping grey ring, red core, white "1" ══ -->
-      <!-- Blue arc: sweeps from ~7 o'clock counter-clockwise over the top to 3 o'clock -->
-      <path d="M 10.5 41 A 15.5 15.5 0 1 1 33.5 33" fill="none" stroke="#5f7fd6" stroke-width="5" stroke-linecap="round"/>
-      <!-- Arrowhead pointing right at 3 o'clock -->
-      <polygon points="30,26 41,32.5 30,39" fill="#5f7fd6"/>
-      <!-- Grey/silver ring -->
-      <circle cx="19" cy="30" r="12.5" fill="none" stroke="#c7c8c9" stroke-width="3.5"/>
-      <!-- Red core -->
-      <circle cx="19" cy="30" r="9.5" fill="#ec4747"/>
-      <!-- White "1" -->
-      <text x="19" y="35" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="700" font-size="14" fill="#ffffff">1</text>
-
-      <!-- ══ CMS wordmark (brand navy, brightened for dark bg) ══ -->
-      <text x="48" y="38" font-family="Arial,sans-serif" font-weight="900" font-size="28" letter-spacing="-1" fill="#7d99e8">CMS</text>
-      <!-- ══ eco ══ -->
-      <text x="112" y="53" text-anchor="end" font-family="Arial,sans-serif" font-weight="700" font-size="13" letter-spacing="1" fill="#9aa0a8">eco</text>
-
-      <!-- ══ Divider ══ -->
-      <line x1="124" y1="12" x2="124" y2="52" stroke="#5f7fd6" stroke-width="1.5" opacity="0.6"/>
-
-      <!-- ══ wi AI agent: gradient ring, robot face, glow ══ -->
-      <g filter="url(#wiGlow)">
-        <!-- Gradient ring (donut) — open at bottom-right like the original -->
-        <path d="M 178 44.5 A 15.5 15.5 0 1 1 186.5 36" fill="none" stroke="url(#wiRing)" stroke-width="5.5" stroke-linecap="round"/>
-        <!-- Robot face -->
-        <circle cx="172" cy="30" r="9.5" fill="#f4f6fb"/>
-        <circle cx="168.5" cy="29" r="1.6" fill="#1a1d28"/>
-        <circle cx="175.5" cy="29" r="1.6" fill="#1a1d28"/>
-        <!-- wi text -->
-        <text x="190" y="52" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="url(#wiText)">wi</text>
-      </g>
-    </svg>
+    <img class="logo-img" src="assets/cms-logo.png" alt="CMS eco" width="1000" height="275">
     <div class="brand-divider"></div>
-    <span class="tool-title">CMS Sign <span style="opacity:0.5;font-weight:400;">— Coordinate Studio</span></span>
+    <span class="tool-title"><strong>CMS Sign</strong> <span style="opacity:0.6;font-weight:400;">— Coordinate Studio</span></span>
   </div>
   <div class="header-right">
     <span class="file-badge" id="filenameBadge"></span>
@@ -247,7 +189,7 @@
       <canvas id="overlayCanvas"></canvas>
       <canvas id="drawCanvas"></canvas>
       <input id="inlineEdit" autocomplete="off" spellcheck="false"
-        style="position:absolute;display:none;z-index:20;background:rgba(255,255,255,0.94);border:1.5px solid #3d7eff;border-radius:2px;color:#000;box-sizing:border-box;outline:none;box-shadow:0 0 0 3px rgba(61,126,255,0.25);">
+        style="position:absolute;display:none;z-index:20;background:rgba(255,255,255,0.96);border:1.5px solid #00AEED;border-radius:2px;color:#2E2E2E;box-sizing:border-box;outline:none;box-shadow:0 0 0 3px rgba(0,174,237,0.25);">
     </div>
   </div>
 
