@@ -41,13 +41,24 @@ Three stacked `<canvas>` elements inside `#canvasCont`:
 `drawAllBoxes()` is the central render function — it clears the overlay and repaints every box for the
 current page. Call it after any state change that affects what's on screen.
 
-### Core state (all module-level vars in app.js)
-- `allBoxes[]` — every signature box across all pages. Each: `{id, name, signeeId, page, x, y, w, h, fieldType, previewText}`
-- `signees[]` — `{id, name, color, rgb, order, type}`. Defaults: Prospect Owner (type 1), Client (2), Manager (3)
-- `currentPage`, `totalPages`, `scale` — PDF view state
-- `currentTool` — `'draw'` | `'move'` | `'multi'`
-- `multiSelected` (Set) — box ids in the current multi-selection
-- `previewMode` (bool) — stamp-preview overlay on/off
+### Multiple open documents
+Several PDFs can be open at once, shown as a tab bar (`#docTabs`) above the PDF panel.
+- `docs[]` — one object per open PDF: `{id, name, baseName, pdfDoc, totalPages, pageOriginalSizes,
+  allBoxes, boxCounter, currentPage, scale, selectedId, multiSelected, previewMode, fitted}`
+- `activeDocId` — which doc the module vars below currently mirror.
+- `activateDoc(id)` saves the live vars back into the outgoing doc (`saveActiveDoc()`), hydrates them
+  from the incoming doc, then re-renders. `closeDoc(id)`, `renderTabs()`, `loadPDFFromFile()` (adds a doc).
+- **Shared across all docs:** `signees[]`, `currentTool`, the clipboards. **Per-doc:** everything else.
+- `renderPage()` is serialised (`renderChain`) + generation-guarded so fast tab switching can't collide
+  two `pdf.js` renders on the shared canvas.
+
+### Core state (module-level vars in app.js — always mirror the ACTIVE doc)
+- `allBoxes[]` — signature boxes for the active doc. Each: `{id, name, signeeId, page, x, y, w, h, fieldType, previewText}`
+- `signees[]` — `{id, name, color, rgb, order, type}`. Defaults: Prospect Owner (type 1), Manager (3), Client (2). Shared across docs.
+- `currentPage`, `totalPages`, `scale` — active-doc PDF view state
+- `currentTool` — `'draw'` | `'move'` | `'multi'` (shared)
+- `multiSelected` (Set) — box ids in the current multi-selection (per-doc)
+- `previewMode` (bool) — stamp-preview overlay on/off (per-doc)
 
 ### Coordinate system
 Boxes are stored in **PDF points** (unscaled). On screen they're multiplied by `scale`. When exporting,
@@ -84,12 +95,13 @@ The CMS admin importer requires this exact shape (see `buildCMSJson()`):
 `previewText` is UI-only and must **never** appear in any export.
 
 ## Feature map (where things live in app.js)
+- **Open documents / tab bar** — `docs[]`, `activateDoc()`, `saveActiveDoc()`, `closeDoc()`, `renderTabs()`, `loadPDFFromFile()`
 - **Drawing / moving boxes** — `drawCanvas` mousedown/move/up handlers
 - **Multi-select + alignment** — `alignBoxes()`, `distributeBoxes()`, `bulkNudge()`, `applyBulkSize()`
 - **Same-tab copy/paste to page** — `copySelection()`, `pasteSelectionToPage()`
-- **Cross-tab clipboard** — `copyToCrossTab()` / `pasteFromCrossTab()` via `localStorage` key `cms_signbox_xtab_clipboard` + `storage` event
-- **JSON import (preview existing coords)** — `importJSON()`, `showImportModal()`, `applyImport()`
-- **Exports** — `getExportData()` (CMS JSON / CSV / TABLE) and `exportPDF()` (jsPDF report)
+- **Cross-tab clipboard** (across *browser* tabs) — `copyToCrossTab()` / `pasteFromCrossTab()` via `localStorage` key `cms_signbox_xtab_clipboard` + `storage` event
+- **JSON import (preview existing coords)** — `importJSON()`, `showImportModal()`, `applyImport()` (targets the active doc)
+- **Export** — `downloadCMSJson()` only (CMS JSON, named `<pdf name> - Coordinates.json`). `exportPDF()` (jsPDF report) still defined but no longer wired to a button.
 - **Stamp preview** — `previewMode`, `drawSignatureBlock()`, `drawSignatureScrawl()`, inline editing via `showInlineEdit()`/`commitInlineEdit()`
 
 ### The signature block preview (`drawSignatureBlock`)

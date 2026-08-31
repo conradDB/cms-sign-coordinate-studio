@@ -148,6 +148,9 @@
 <!-- ── PDF PANEL ── -->
 <div class="pdf-panel glass">
 
+  <!-- Document tab bar — one tab per open PDF -->
+  <div class="doc-tabs" id="docTabs" style="display:none;"></div>
+
   <div class="pdf-toolbar" id="pdfToolbar" style="display:none;">
     <div class="page-nav">
       <button class="nav-btn" id="prevBtn" onclick="changePage(-1)" disabled>‹</button>
@@ -247,7 +250,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<input type="file" id="fileInput" accept=".pdf" onchange="loadPDF(this)">
+<input type="file" id="fileInput" accept=".pdf" multiple onchange="loadPDF(this)">
 <input type="file" id="jsonImportInput" accept=".json" onchange="importJSON(this)">
 
 

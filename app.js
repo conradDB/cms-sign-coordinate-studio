@@ -23,7 +23,19 @@ let cmsLogoDataUrl=null, cmsLogoAspect=1000/275;
 let pdfDoc=null, currentPage=1, totalPages=0, scale=1.5;
 let allBoxes=[], boxCounter=0;
 let pageOriginalSizes={};
-let pdfBaseName='';   // uploaded PDF's name without extension — used for the export filename
+let pdfBaseName='';   // active PDF's name without extension — used for the export filename
+
+// ── OPEN DOCUMENTS ──
+// Each open PDF is a self-contained doc; the module vars above (pdfDoc, allBoxes,
+// currentPage, scale, selectedId, multiSelected, previewMode, pageOriginalSizes,
+// pdfBaseName, totalPages) always mirror the ACTIVE doc. Switching tabs saves the
+// active doc's state back into its object, then hydrates the vars from the next one.
+let docs=[];           // [{id,name,baseName,pdfDoc,totalPages,pageOriginalSizes,allBoxes,
+                       //   boxCounter,currentPage,scale,selectedId,multiSelected,previewMode,fitted}]
+let activeDocId=null;
+let docCounter=0;
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
 // Signee colour-code — CMS CI core + supporting palette (all readable on white)
 const COLORS=['#31459C','#00AEED','#40B100','#FF532F','#800080','#195869','#DF0020','#585858'];
@@ -65,14 +77,34 @@ const dctx=drawCanvas.getContext('2d');
 
 // ── DRAG & DROP FILE ──
 const dz=document.getElementById('dropZone');
+async function acceptDroppedPDFs(e){
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const pdfs=[...e.dataTransfer.files].filter(f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name));
+  for(const f of pdfs) await loadPDFFromFile(f);
+}
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f?.type==='application/pdf')loadPDFFromFile(f);});
+dz.addEventListener('drop',acceptDroppedPDFs);
+// Once documents are open, dropping onto the panel opens more of them
+const pdfPanelEl=document.querySelector('.pdf-panel');
+if(pdfPanelEl){
+  pdfPanelEl.addEventListener('dragover',e=>{if([...e.dataTransfer.types].includes('Files'))e.preventDefault();});
+  pdfPanelEl.addEventListener('drop',e=>{if([...e.dataTransfer.files].some(f=>/\.pdf$/i.test(f.name)))acceptDroppedPDFs(e);});
+}
 
 // ── KEYBOARD ──
 document.addEventListener('keydown',e=>{
   const tag=e.target.tagName;
   if(tag==='INPUT'||tag==='SELECT') return;
+  // Ctrl+Tab / Ctrl+Shift+Tab — cycle open documents
+  if(e.ctrlKey && e.key==='Tab' && docs.length>1){
+    e.preventDefault();
+    const i=docs.findIndex(d=>d.id===activeDocId);
+    const next=(i+(e.shiftKey?-1:1)+docs.length)%docs.length;
+    activateDoc(docs[next].id);
+    return;
+  }
   if(e.key==='d'||e.key==='D') setTool('draw');
   if(e.key==='m'||e.key==='M') setTool('move');
   if(e.key==='s'||e.key==='S') setTool('multi');
@@ -172,32 +204,164 @@ function setTool(t){
   drawAllBoxes();
 }
 
-// ── PDF LOAD ──
-async function loadPDF(inp){const f=inp.files[0];if(!f)return;loadPDFFromFile(f);inp.value='';}
+// ── PDF LOAD (multi-document) ──
+async function loadPDF(inp){
+  for(const f of [...inp.files]) await loadPDFFromFile(f);
+  inp.value='';
+}
+
 async function loadPDFFromFile(file){
-  document.getElementById('filenameBadge').textContent=file.name;
-  pdfBaseName=file.name.replace(/\.pdf$/i,'').trim();
-  allBoxes=[];boxCounter=0;pageOriginalSizes={};updatePanel();
+  if(file.type && file.type!=='application/pdf') return;
   const buf=await file.arrayBuffer();
-  pdfDoc=await pdfjsLib.getDocument({data:buf}).promise;
-  totalPages=pdfDoc.numPages; currentPage=1;
-  for(let i=1;i<=totalPages;i++){
-    const pg=await pdfDoc.getPage(i);
+  const pd=await pdfjsLib.getDocument({data:buf}).promise;
+  const sizes={};
+  for(let i=1;i<=pd.numPages;i++){
+    const pg=await pd.getPage(i);
     const vp=pg.getViewport({scale:1});
-    pageOriginalSizes[i]={width:vp.width,height:vp.height};
+    sizes[i]={width:vp.width,height:vp.height};
   }
+  const doc={
+    id:++docCounter,
+    name:file.name,
+    baseName:file.name.replace(/\.pdf$/i,'').trim(),
+    pdfDoc:pd,
+    totalPages:pd.numPages,
+    pageOriginalSizes:sizes,
+    allBoxes:[], boxCounter:0,
+    currentPage:1, scale:1.5,
+    selectedId:null, multiSelected:new Set(),
+    previewMode:false, fitted:false
+  };
+  docs.push(doc);
   document.getElementById('dropZone').style.display='none';
   document.getElementById('pdfWrap').style.display='flex';
   document.getElementById('pdfToolbar').style.display='flex';
   document.getElementById('hintBar').style.display='flex';
+  document.getElementById('docTabs').style.display='flex';
   document.getElementById('importJsonBtn').disabled=false;
-  await renderPage(currentPage); fitToWidth();
+  await activateDoc(doc.id);
 }
 
-async function renderPage(num){
+// Copy the live module vars back into the currently-active doc object
+function saveActiveDoc(){
+  const d=docs.find(x=>x.id===activeDocId);
+  if(!d) return;
+  d.allBoxes=allBoxes; d.boxCounter=boxCounter;
+  d.currentPage=currentPage; d.scale=scale;
+  d.selectedId=selectedId; d.multiSelected=multiSelected;
+  d.previewMode=previewMode;
+}
+
+// Make a doc active: persist the outgoing one, hydrate vars from the incoming one
+async function activateDoc(id){
+  if(activeDocId!=null && activeDocId!==id) saveActiveDoc();
+  const d=docs.find(x=>x.id===id);
+  if(!d) return;
+  activeDocId=id;
+  commitInlineEdit();
+  isDrawing=isDragging=isMultiDrag=isMarquee=false;
+  pdfDoc=d.pdfDoc;
+  totalPages=d.totalPages;
+  pageOriginalSizes=d.pageOriginalSizes;
+  allBoxes=d.allBoxes;
+  boxCounter=d.boxCounter;
+  currentPage=d.currentPage;
+  scale=d.scale;
+  selectedId=d.selectedId;
+  multiSelected=d.multiSelected;
+  previewMode=d.previewMode;
+  pdfBaseName=d.baseName;
+  document.getElementById('filenameBadge').textContent=d.name;
+  syncPreviewUI();
+  renderTabs();
+  updateAlignPanel();
+  // First time this doc is shown, fit it to the panel width (single render below)
+  if(!d.fitted){
+    const w=document.getElementById('pdfWrap').clientWidth-48;
+    if(w>50 && pageOriginalSizes[currentPage]){
+      const s=Math.round((w/pageOriginalSizes[currentPage].width)*100)/100;
+      scale=Math.min(3,Math.max(0.4, s>0.1?s:1.5));
+      document.getElementById('zoomLbl').textContent=Math.round(scale*100)+'%';
+      d.fitted=true;
+    }
+  }
+  await renderPage(currentPage);
+  updatePanel();
+  renderSignees();
+}
+
+function closeDoc(id){
+  const idx=docs.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  const d=docs[idx];
+  const live=(d.id===activeDocId)?allBoxes:d.allBoxes;
+  if(live.length && !confirm(`Close "${d.name}"?\nIts ${live.length} box(es) will be discarded.`)) return;
+  try{ d.pdfDoc.destroy(); }catch(e){}
+  docs.splice(idx,1);
+  if(activeDocId!==id){ renderTabs(); return; }
+  activeDocId=null;
+  if(docs.length){
+    activateDoc(docs[Math.min(idx,docs.length-1)].id);
+  }else{
+    pdfDoc=null; allBoxes=[]; boxCounter=0; totalPages=0; currentPage=1;
+    pageOriginalSizes={}; selectedId=null; multiSelected.clear();
+    previewMode=false; pdfBaseName='';
+    octx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+    document.getElementById('dropZone').style.display='flex';
+    document.getElementById('pdfWrap').style.display='none';
+    document.getElementById('pdfToolbar').style.display='none';
+    document.getElementById('hintBar').style.display='none';
+    document.getElementById('docTabs').style.display='none';
+    document.getElementById('filenameBadge').textContent='';
+    document.getElementById('importJsonBtn').disabled=true;
+    syncPreviewUI();
+    updatePanel(); renderSignees(); updateAlignPanel();
+  }
+}
+
+function renderTabs(){
+  const bar=document.getElementById('docTabs');
+  if(!bar) return;
+  bar.innerHTML=docs.map(d=>{
+    const active=d.id===activeDocId;
+    const n=(active?allBoxes:d.allBoxes).length;
+    return `<div class="doc-tab${active?' active':''}" onclick="activateDoc(${d.id})" title="${esc(d.name)}">
+      <span class="doc-tab-name">${esc(d.baseName||d.name)}</span>
+      ${n?`<span class="doc-tab-count">${n}</span>`:''}
+      <span class="doc-tab-close" onclick="event.stopPropagation();closeDoc(${d.id})" title="Close document">✕</span>
+    </div>`;
+  }).join('')+`<button class="doc-tab-add" onclick="document.getElementById('fileInput').click()" title="Open another PDF">+</button>`;
+}
+
+function syncPreviewUI(){
+  const b=document.getElementById('previewToggleBtn');
+  if(b){
+    b.classList.toggle('btn-primary',previewMode);
+    b.textContent=previewMode?'👁 Preview ON':'👁 Preview';
+  }
+  const ht=document.getElementById('hintText');
+  if(ht) ht.textContent=previewMode
+    ?'Preview: click any text or date field to type into it · click a checkbox to toggle ✔ · signature fields show the stamp block'
+    :'Draw: drag to create box. Move: click box to drag. Multi-Select: drag marquee or click boxes, then align.';
+}
+
+// Renders are serialised through renderChain so two page.render() calls never
+// touch the shared canvas at once (pdf.js forbids that). renderGen lets a stale
+// render bail out early when a newer one has been requested (fast tab switching).
+let renderChain=Promise.resolve(), renderGen=0, curRenderTask=null;
+function renderPage(num){
   commitInlineEdit(); // close any open inline editor before re-rendering
+  const myGen=++renderGen;
+  if(curRenderTask){ try{ curRenderTask.cancel(); }catch(e){} } // free the canvas for the next render
+  renderChain=renderChain.then(()=>_renderPage(num,myGen)).catch(err=>{
+    if(!(err && err.name==='RenderingCancelledException')) console.error('renderPage:',err);
+  });
+  return renderChain;
+}
+async function _renderPage(num,myGen){
+  if(myGen!==renderGen || !pdfDoc) return;   // superseded, or no active doc
   const page=await pdfDoc.getPage(num);
-  // Use device pixel ratio for crisp rendering
+  if(myGen!==renderGen || !pdfDoc) return;
   const dpr=window.devicePixelRatio||1;
   const vp=page.getViewport({scale});
   const cssW=vp.width, cssH=vp.height;
@@ -223,7 +387,17 @@ async function renderPage(num){
   octx.setTransform(dpr,0,0,dpr,0,0);
   dctx.setTransform(dpr,0,0,dpr,0,0);
 
-  await page.render({canvasContext:ctx,viewport:vp}).promise;
+  const task=page.render({canvasContext:ctx,viewport:vp});
+  curRenderTask=task;
+  try{
+    await task.promise;
+  }catch(e){
+    if(curRenderTask===task) curRenderTask=null;
+    if(e && e.name==='RenderingCancelledException') return; // superseded — next render takes over
+    throw e;
+  }
+  if(curRenderTask===task) curRenderTask=null;
+  if(myGen!==renderGen) return;   // a newer render superseded us while we painted
   drawAllBoxes();
   updatePageNav();
 }
@@ -713,8 +887,9 @@ function changeZoom(d){scale=Math.max(.4,Math.min(3,scale+d));document.getElemen
 function fitToWidth(){
   const wrap=document.getElementById('pdfWrap');
   const w=wrap.clientWidth-48;
-  if(pdfDoc&&pageOriginalSizes[currentPage]){
-    scale=Math.round((w/pageOriginalSizes[currentPage].width)*100)/100;
+  if(pdfDoc && pageOriginalSizes[currentPage] && w>50){
+    const s=Math.round((w/pageOriginalSizes[currentPage].width)*100)/100;
+    scale=Math.min(3,Math.max(0.4, s>0.1?s:1.5));
     document.getElementById('zoomLbl').textContent=Math.round(scale*100)+'%';
     renderPage(currentPage);
   }
@@ -727,6 +902,7 @@ function updatePanel(){
   document.getElementById('countBadge').textContent=allBoxes.length;
   const hasBoxes=allBoxes.length>0;
   document.getElementById('jsonDlBtn').disabled=!hasBoxes;
+  if(docs.length) renderTabs();
   if(!hasBoxes){list.style.display='none';empty.style.display='flex';return;}
   list.style.display='block'; empty.style.display='none';
   const sorted=[...allBoxes].sort((a,b)=>a.page!==b.page?a.page-b.page:a.id-b.id);
@@ -808,15 +984,7 @@ function updPreviewText(id,v){const b=allBoxes.find(b=>b.id===id);if(b){b.previe
 function togglePreviewMode(){
   previewMode=!previewMode;
   if(!previewMode) commitInlineEdit();
-  const b=document.getElementById('previewToggleBtn');
-  if(b){
-    b.classList.toggle('btn-primary',previewMode);
-    b.textContent=previewMode?'👁 Preview ON':'👁 Preview';
-  }
-  const ht=document.getElementById('hintText');
-  if(ht) ht.textContent=previewMode
-    ?'Preview: click any text or date field to type into it · click a checkbox to toggle ✔ · signature fields show the stamp block'
-    :'Draw: drag to create box. Move: click box to drag. Multi-Select: drag marquee or click boxes, then align.';
+  syncPreviewUI();
   drawAllBoxes();
   showToast(previewMode
     ?'Preview ON — sample stamps shown (dates, ✔ marks, field names)'
