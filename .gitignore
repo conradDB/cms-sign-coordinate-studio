@@ -5,3 +5,7 @@ node_modules/
 *.log
 .vscode/
 .idea/
+
+# Local Claude Code config (auto-push hook is a personal workflow)
+.claude/settings.local.json
+.claude/auto-push.sh
