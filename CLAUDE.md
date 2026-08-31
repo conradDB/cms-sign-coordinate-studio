@@ -1,0 +1,124 @@
+# CMS Sign — Coordinate Studio
+
+Internal tool for **CMS Systems** (automotive software, South Africa) that places digital-signing
+field coordinates onto PDF documents (offers to purchase, lease agreements, etc.) and exports them
+as a JSON file the CMS admin system imports.
+
+The original pain point: coordinates were found by hand in Adobe Acrobat, one box at a time, across
+documents up to 50 pages. This tool replaces that with a visual drag-to-draw picker.
+
+## Architecture
+
+Deliberately a **static, dependency-free, single-page app**. No framework, no build step, no server,
+no bundler. Just three files loaded directly by the browser:
+
+| File          | Contents                                                              |
+|---------------|-----------------------------------------------------------------------|
+| `index.html`  | Markup + DOM structure. Loads `styles.css` and `app.js`.              |
+| `styles.css`  | All styling. The "liquid glass" design system (see Design below).     |
+| `app.js`      | All application logic. ~1400 lines of vanilla JS, no modules.         |
+
+External libraries are loaded from CDN in `index.html` (not bundled):
+- **pdf.js** (`cdnjs`) — renders PDF pages to a canvas
+- **jsPDF** (`cdnjs`) — generates the PDF coordinate-report export
+- **Google Fonts** — Space Grotesk (display), Inter (body), JetBrains Mono (coordinates)
+
+### Why no framework
+Portability is the point. A CMS staffer can double-click `index.html` and it runs. It can be dropped
+onto any static host. Keep it that way unless there's a strong reason not to — do **not** introduce
+React, a bundler, or a build step without discussing the tradeoff.
+
+## How it works (mental model)
+
+Three stacked `<canvas>` elements inside `#canvasCont`:
+1. `#pdfCanvas` — the rendered PDF page (from pdf.js), retina-scaled via `devicePixelRatio`
+2. `#overlayCanvas` — all the drawn signature boxes, labels, and preview stamps
+3. `#drawCanvas` — the top interaction layer that captures mouse events
+
+`drawAllBoxes()` is the central render function — it clears the overlay and repaints every box for the
+current page. Call it after any state change that affects what's on screen.
+
+### Core state (all module-level vars in app.js)
+- `allBoxes[]` — every signature box across all pages. Each: `{id, name, signeeId, page, x, y, w, h, fieldType, previewText}`
+- `signees[]` — `{id, name, color, rgb, order, type}`. Defaults: Prospect Owner (type 1), Client (2), Manager (3)
+- `currentPage`, `totalPages`, `scale` — PDF view state
+- `currentTool` — `'draw'` | `'move'` | `'multi'`
+- `multiSelected` (Set) — box ids in the current multi-selection
+- `previewMode` (bool) — stamp-preview overlay on/off
+
+### Coordinate system
+Boxes are stored in **PDF points** (unscaled). On screen they're multiplied by `scale`. When exporting,
+the stored point values go straight out — they match what the CMS admin system expects. Don't store
+scaled/pixel values in `allBoxes`.
+
+## Field types (must match CMS admin system)
+| Value | Meaning                    | Preview render                          |
+|-------|----------------------------|-----------------------------------------|
+| 0     | Signature                  | Full CMS Sign signature block (see below)|
+| 2     | Date Auto Stamp            | Today's date, Arial 8pt                 |
+| 5     | Plain Text (Mandatory)     | Typed text, Arial 8pt                    |
+| 6     | Plain Text (Optional)      | Typed text, Arial 8pt                    |
+| 9     | Check Box                  | ✔ mark, Adobe Pi Std 7pt (falls back to ZapfDingbats) |
+
+Signee types: Prospect Owner = 1, Client = 2, Manager = 3.
+
+## Export format (CMS JSON) — DO NOT CHANGE STRUCTURE
+The CMS admin importer requires this exact shape (see `buildCMSJson()`):
+```json
+{
+  "DocumentID": 1234,                    // auto-generated random 4-digit
+  "DocSignees": [{
+    "Order": 1, "Type": 1, "Description": "Prospect Owner", "IsActive": true,
+    "DocSignFields": [{
+      "Page": 1, "Type": 0,
+      "XCoordinate": 40, "XOffset": null, "YCoordinate": 684, "YOffset": null,
+      "Width": 127, "Height": 30, "TagName": "Sign",
+      "IsInvisible": false, "IsActive": true
+    }]
+  }]
+}
+```
+`previewText` is UI-only and must **never** appear in any export.
+
+## Feature map (where things live in app.js)
+- **Drawing / moving boxes** — `drawCanvas` mousedown/move/up handlers
+- **Multi-select + alignment** — `alignBoxes()`, `distributeBoxes()`, `bulkNudge()`, `applyBulkSize()`
+- **Same-tab copy/paste to page** — `copySelection()`, `pasteSelectionToPage()`
+- **Cross-tab clipboard** — `copyToCrossTab()` / `pasteFromCrossTab()` via `localStorage` key `cms_signbox_xtab_clipboard` + `storage` event
+- **JSON import (preview existing coords)** — `importJSON()`, `showImportModal()`, `applyImport()`
+- **Exports** — `getExportData()` (CMS JSON / CSV / TABLE) and `exportPDF()` (jsPDF report)
+- **Stamp preview** — `previewMode`, `drawSignatureBlock()`, `drawSignatureScrawl()`, inline editing via `showInlineEdit()`/`commitInlineEdit()`
+
+### The signature block preview (`drawSignatureBlock`)
+Reproduces the real CMS Sign stamp: white rounded-border box, blue "Signature" legend sitting *on*
+the top border, a bezier-drawn handwritten scrawl, and a "Powered by ● CMS Sign" footer sitting *on*
+the bottom border (white break in the line behind both legends, fieldset-style).
+
+## Design system (styles.css)
+"Liquid glass" — frosted translucent panels on a lit obsidian field. Key ideas:
+- `.glass` primitive: `backdrop-filter: blur+saturate`, specular top-edge highlight (`::after`), layered shadow
+- Body has a noise-grain overlay (`body::before`) so glass isn't flat
+- Accent system: azure `#3d7eff` + mint `#00e5b0`; CMS red `#c0392b` reserved for logo/danger
+- Signee palette: 8 glowing colours (`--s1..--s8`), dots cast light via `box-shadow`
+- Fonts: Space Grotesk / Inter / JetBrains Mono
+- CSS custom properties define everything — change tokens in `:root`, not individual rules
+
+## Conventions & gotchas
+- **After editing coordinates or boxes, always call `drawAllBoxes()`** to repaint.
+- **Retina**: canvases are sized `cssPx * devicePixelRatio` and the context is scaled; don't assume 1:1.
+- **Preview mode suppresses all editing chrome** (labels, handles, selection outlines) at every zoom level.
+- **`select` dropdowns**: native option lists are OS-rendered and can't be fully glass-styled — this is a known browser limitation, not a bug.
+- **Element IDs are the integration contract** between `app.js` and `index.html` — if you rename one, grep both files.
+- When adding a new field type, update: the type table above, the card `<select>` in `updatePanel()`, and the preview renderer.
+
+## Local dev
+```bash
+npm install      # only installs a static server (serve)
+npm start        # serves at http://localhost:3000
+```
+Or just open `index.html` directly — no server strictly required (pdf.js worker prefers http(s),
+so the server is recommended).
+
+## Deploy
+Static host, any provider. `netlify.toml` is included (headers + SPA redirect). Netlify Drop:
+drag the folder onto app.netlify.com/drop.

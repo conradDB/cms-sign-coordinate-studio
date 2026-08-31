@@ -1,0 +1,22 @@
+{
+  "name": "cms-sign-coordinate-studio",
+  "version": "1.0.0",
+  "description": "Visual PDF signature-coordinate picker for CMS Systems. Draw signature fields on PDFs and export coordinates as CMS-admin JSON.",
+  "private": true,
+  "scripts": {
+    "start": "serve -l 3000 .",
+    "dev": "serve -l 3000 ."
+  },
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "keywords": [
+    "pdf",
+    "signature",
+    "coordinates",
+    "cms",
+    "digital-signing"
+  ],
+  "author": "CMS Systems",
+  "license": "UNLICENSED"
+}

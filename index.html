@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMS Sign — Coordinate Studio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="brand">
+    <!-- CMS eco + wi logo — crisp vector recreation, tuned for dark backgrounds -->
+    <svg class="logo-svg" viewBox="0 0 208 64" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="wiRing" x1="20%" y1="0%" x2="80%" y2="100%">
+          <stop offset="0%"  stop-color="#ff6ec7"/>
+          <stop offset="35%" stop-color="#c95fd1"/>
+          <stop offset="70%" stop-color="#7a6bd6"/>
+          <stop offset="100%" stop-color="#4a67c4"/>
+        </linearGradient>
+        <linearGradient id="wiText" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#c95fd1"/>
+          <stop offset="100%" stop-color="#7a6bd6"/>
+        </linearGradient>
+        <filter id="wiGlow" x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b1"/>
+          <feColorMatrix in="b1" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.5 0" result="g1"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b2"/>
+          <feColorMatrix in="b2" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.0 0" result="g2"/>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="13" result="b3"/>
+          <feColorMatrix in="b3" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.5 0" result="g3"/>
+          <feMerge>
+            <feMergeNode in="g3"/><feMergeNode in="g2"/><feMergeNode in="g1"/><feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- ══ Badge: blue arc + arrowhead wrapping grey ring, red core, white "1" ══ -->
+      <!-- Blue arc: sweeps from ~7 o'clock counter-clockwise over the top to 3 o'clock -->
+      <path d="M 10.5 41 A 15.5 15.5 0 1 1 33.5 33" fill="none" stroke="#5f7fd6" stroke-width="5" stroke-linecap="round"/>
+      <!-- Arrowhead pointing right at 3 o'clock -->
+      <polygon points="30,26 41,32.5 30,39" fill="#5f7fd6"/>
+      <!-- Grey/silver ring -->
+      <circle cx="19" cy="30" r="12.5" fill="none" stroke="#c7c8c9" stroke-width="3.5"/>
+      <!-- Red core -->
+      <circle cx="19" cy="30" r="9.5" fill="#ec4747"/>
+      <!-- White "1" -->
+      <text x="19" y="35" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="700" font-size="14" fill="#ffffff">1</text>
+
+      <!-- ══ CMS wordmark (brand navy, brightened for dark bg) ══ -->
+      <text x="48" y="38" font-family="Arial,sans-serif" font-weight="900" font-size="28" letter-spacing="-1" fill="#7d99e8">CMS</text>
+      <!-- ══ eco ══ -->
+      <text x="112" y="53" text-anchor="end" font-family="Arial,sans-serif" font-weight="700" font-size="13" letter-spacing="1" fill="#9aa0a8">eco</text>
+
+      <!-- ══ Divider ══ -->
+      <line x1="124" y1="12" x2="124" y2="52" stroke="#5f7fd6" stroke-width="1.5" opacity="0.6"/>
+
+      <!-- ══ wi AI agent: gradient ring, robot face, glow ══ -->
+      <g filter="url(#wiGlow)">
+        <!-- Gradient ring (donut) — open at bottom-right like the original -->
+        <path d="M 178 44.5 A 15.5 15.5 0 1 1 186.5 36" fill="none" stroke="url(#wiRing)" stroke-width="5.5" stroke-linecap="round"/>
+        <!-- Robot face -->
+        <circle cx="172" cy="30" r="9.5" fill="#f4f6fb"/>
+        <circle cx="168.5" cy="29" r="1.6" fill="#1a1d28"/>
+        <circle cx="175.5" cy="29" r="1.6" fill="#1a1d28"/>
+        <!-- wi text -->
+        <text x="190" y="52" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="url(#wiText)">wi</text>
+      </g>
+    </svg>
+    <div class="brand-divider"></div>
+    <span class="tool-title">CMS Sign <span style="opacity:0.5;font-weight:400;">— Coordinate Studio</span></span>
+  </div>
+  <div class="header-right">
+    <span class="file-badge" id="filenameBadge"></span>
+    <button class="btn" onclick="document.getElementById('fileInput').click()">📂 Open PDF</button>
+    <button class="btn" id="importJsonBtn" onclick="document.getElementById('jsonImportInput').click()" disabled title="Import existing CMS JSON to preview coordinates">📥 Import JSON</button>
+    <button class="btn btn-primary" id="exportBtn" onclick="copyExport()" disabled>⬆ Copy Export</button>
+  </div>
+</header>
+
+<div class="workspace">
+
+<!-- ── LEFT PANEL ── -->
+<div class="left-panel glass">
+
+  <div class="lp-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="sec-label">Signees <span style="font-size:9px;color:var(--ink-4);text-transform:none;letter-spacing:0;font-weight:400;">— select before drawing</span></div>
+    <div class="signee-list" id="signeeList"></div>
+    <div class="add-row" style="margin-top:9px;">
+      <input class="inp" id="newSigneeName" placeholder="New signee…" maxlength="30"
+        onkeydown="if(event.key==='Enter')addSignee()">
+      <button class="btn btn-sm btn-primary" onclick="addSignee()" title="Add">+</button>
+    </div>
+  </div>
+
+  <div class="lp-section">
+    <div class="sec-label">Tools</div>
+    <div class="tool-btns">
+      <button class="tool-btn active" id="toolDraw" onclick="setTool('draw')">
+        <span class="t-icon">✏️</span> Draw Box <span class="kbd">D</span>
+      </button>
+      <button class="tool-btn" id="toolMove" onclick="setTool('move')">
+        <span class="t-icon">✋</span> Move Box <span class="kbd">M</span>
+      </button>
+      <button class="tool-btn" id="toolMulti" onclick="setTool('multi')">
+        <span class="t-icon">⬚</span> Multi-Select <span class="kbd">S</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Alignment panel — shown when 2+ boxes selected -->
+  <div class="lp-section" id="alignSection" style="display:none;padding-bottom:14px;">
+    <div class="sec-label" style="margin-bottom:8px;">Selection <span id="selCount" style="color:var(--mint);font-weight:700;text-transform:none;letter-spacing:0;font-size:11px;"></span></div>
+
+    <!-- Bulk Move -->
+    <div style="margin-bottom:4px;font-size:9px;color:var(--ink-4);letter-spacing:.5px;text-transform:uppercase;">Move (drag on canvas or nudge)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:9px;color:var(--ink-4);margin-bottom:2px;">Shift X</div>
+        <div style="display:flex;gap:3px;">
+          <button class="align-btn wide" onclick="bulkNudge(-1,0)" title="Move left 1px">← 1</button>
+          <button class="align-btn wide" onclick="bulkNudge(1,0)"  title="Move right 1px">1 →</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--ink-4);margin-bottom:2px;">Shift Y</div>
+        <div style="display:flex;gap:3px;">
+          <button class="align-btn wide" onclick="bulkNudge(0,-1)" title="Move up 1px">↑ 1</button>
+          <button class="align-btn wide" onclick="bulkNudge(0,1)"  title="Move down 1px">1 ↓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bulk Size -->
+    <div style="margin-bottom:4px;font-size:9px;color:var(--ink-4);letter-spacing:.5px;text-transform:uppercase;">Bulk Resize</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:9px;color:var(--ink-4);margin-bottom:2px;">Set Width</div>
+        <div style="display:flex;gap:3px;align-items:center;">
+          <input class="inp" id="bulkW" type="number" min="1" placeholder="W"
+            style="padding:3px 5px;font-size:11px;font-family:var(--font-mono);width:100%;">
+          <button class="align-btn" onclick="applyBulkSize('w')" title="Apply width to all selected" style="padding:4px 6px;white-space:nowrap;">✓</button>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--ink-4);margin-bottom:2px;">Set Height</div>
+        <div style="display:flex;gap:3px;align-items:center;">
+          <input class="inp" id="bulkH" type="number" min="1" placeholder="H"
+            style="padding:3px 5px;font-size:11px;font-family:var(--font-mono);width:100%;">
+          <button class="align-btn" onclick="applyBulkSize('h')" title="Apply height to all selected" style="padding:4px 6px;white-space:nowrap;">✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Align -->
+    <div style="margin-bottom:4px;font-size:9px;color:var(--ink-4);letter-spacing:.5px;text-transform:uppercase;">Align</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:4px;">
+      <button class="align-btn" onclick="alignBoxes('left')"    title="Align Left Edges">⬛◻◻<br><span style="font-size:8px;">Left</span></button>
+      <button class="align-btn" onclick="alignBoxes('centerH')" title="Align Centers Horizontally">◻⬛◻<br><span style="font-size:8px;">Center</span></button>
+      <button class="align-btn" onclick="alignBoxes('right')"   title="Align Right Edges">◻◻⬛<br><span style="font-size:8px;">Right</span></button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px;">
+      <button class="align-btn" onclick="alignBoxes('top')"     title="Align Top Edges">⬛⬛⬛<br><span style="font-size:8px;">Top</span></button>
+      <button class="align-btn" onclick="alignBoxes('centerV')" title="Align Centers Vertically">───<br><span style="font-size:8px;">Middle</span></button>
+      <button class="align-btn" onclick="alignBoxes('bottom')"  title="Align Bottom Edges">▁▁▁<br><span style="font-size:8px;">Bottom</span></button>
+    </div>
+
+    <!-- Distribute -->
+    <div style="margin-bottom:4px;font-size:9px;color:var(--ink-4);letter-spacing:.5px;text-transform:uppercase;">Distribute</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px;">
+      <button class="align-btn wide" onclick="distributeBoxes('h')">↔ Horiz</button>
+      <button class="align-btn wide" onclick="distributeBoxes('v')">↕ Vert</button>
+    </div>
+
+    <!-- Copy / Paste selection -->
+    <div style="margin-bottom:4px;font-size:9px;color:var(--ink-4);letter-spacing:.5px;text-transform:uppercase;">Same Tab</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+      <button class="align-btn wide" onclick="copySelection()" id="copySelBtn" style="padding:6px;">📋 Copy</button>
+      <button class="align-btn wide" onclick="showPastePicker()" id="pasteSelBtn" style="padding:6px;display:none;">📌 Paste to…</button>
+    </div>
+    <!-- Page picker — shown after copying -->
+    <div id="pastePicker" style="display:none;margin-bottom:8px;">
+      <div style="font-size:9px;color:var(--ink-4);margin-bottom:4px;">Paste onto page:</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;" id="pastePageBtns"></div>
+    </div>
+    <!-- Cross-tab copy -->
+    <div style="margin-bottom:4px;font-size:9px;color:var(--ink-4);letter-spacing:.5px;text-transform:uppercase;">Cross-Tab</div>
+    <button class="align-btn wide" onclick="copyToCrossTab()" style="padding:6px;width:100%;margin-bottom:2px;">
+      🌐 Copy to Other Tab
+    </button>
+    <div style="font-size:9px;color:var(--ink-4);line-height:1.5;padding:2px 0 6px;">
+      Copies selection to shared clipboard.<br>Switch tabs and use <strong style="color:var(--ink-1);">Ctrl+Shift+V</strong> or the banner to paste.
+    </div>
+
+    <button class="btn btn-sm btn-danger" style="width:100%;justify-content:center;" onclick="deleteSelected()">🗑 Delete Selected</button>
+  </div>
+
+</div>
+
+<!-- ── PDF PANEL ── -->
+<div class="pdf-panel glass">
+
+  <div class="pdf-toolbar" id="pdfToolbar" style="display:none;">
+    <div class="page-nav">
+      <button class="nav-btn" id="prevBtn" onclick="changePage(-1)" disabled>‹</button>
+      <span class="page-ctr" id="pageCtr">1 / 1</span>
+      <button class="nav-btn" id="nextBtn" onclick="changePage(1)" disabled>›</button>
+    </div>
+    <div class="sep"></div>
+    <div class="zoom-wrap">
+      <button class="btn btn-sm btn-icon" onclick="changeZoom(-0.2)">−</button>
+      <span class="z-lbl" id="zoomLbl">100%</span>
+      <button class="btn btn-sm btn-icon" onclick="changeZoom(0.2)">+</button>
+      <button class="btn btn-sm" onclick="fitToWidth()" style="margin-left:2px;">Fit</button>
+      <button class="btn btn-sm" id="previewToggleBtn" onclick="togglePreviewMode()" title="Show sample stamps in every field — dates, check marks, text — exactly as they will print">👁 Preview</button>
+    </div>
+    <div class="active-badge" id="activeBadge">
+      <div class="ab-dot" id="abDot"></div>
+      <span id="abName">No signee</span>
+    </div>
+  </div>
+
+  <div class="hint-bar" id="hintBar" style="display:none;">
+    <div class="h-dot" id="hDot"></div>
+    <span id="hintText">Draw: drag to create box. Move: click box to drag. Multi-Select: drag marquee or click boxes, then align.</span>
+  </div>
+
+  <div id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="drop-box">
+      <div class="drop-icon">📄</div>
+      <div class="drop-title">Open a PDF document</div>
+      <div class="drop-sub">Drag &amp; drop or click to browse<br>Offer to purchase, lease agreements,<br>any multi-page document</div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="document.getElementById('fileInput').click();event.stopPropagation()">Browse Files</button>
+    </div>
+  </div>
+
+  <div class="pdf-wrap" id="pdfWrap" style="display:none;" onscroll="closeCtx()">
+    <div class="canvas-container" id="canvasCont">
+      <canvas id="pdfCanvas"></canvas>
+      <canvas id="overlayCanvas"></canvas>
+      <canvas id="drawCanvas"></canvas>
+      <input id="inlineEdit" autocomplete="off" spellcheck="false"
+        style="position:absolute;display:none;z-index:20;background:rgba(255,255,255,0.94);border:1.5px solid #3d7eff;border-radius:2px;color:#000;box-sizing:border-box;outline:none;box-shadow:0 0 0 3px rgba(61,126,255,0.25);">
+    </div>
+  </div>
+
+</div>
+
+<!-- ── RIGHT PANEL ── -->
+<div class="right-panel glass">
+
+  <div class="rp-head">
+    <div style="display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;">
+      <span class="rp-title">Signature Boxes</span>
+      <span class="count-badge" id="countBadge">0</span>
+    </div>
+    <div style="display:flex;gap:5px;flex-shrink:0;margin-left:8px;">
+      <button class="btn btn-sm btn-ghost" onclick="clearAllPreviewText()" title="Clear all typed preview text">🧹 Clear Preview</button>
+      <button class="btn btn-sm btn-danger" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty-st">
+    <div class="empty-ico">□</div>
+    <div class="empty-t">No boxes drawn yet</div>
+    <div class="empty-s">Add signees on the left,<br>then draw boxes on the PDF</div>
+  </div>
+
+  <div class="coords-list" id="coordsList" style="display:none;"></div>
+
+  <div class="exp-sec">
+    <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink-3);margin-bottom:7px;">Export</div>
+
+    <div class="fmt-tabs">
+      <div class="fmt-tab active" onclick="setFormat('cms')" id="fmt-cms">CMS JSON</div>
+      <div class="fmt-tab" onclick="setFormat('csv')" id="fmt-csv">CSV</div>
+      <div class="fmt-tab" onclick="setFormat('table')" id="fmt-table">TABLE</div>
+    </div>
+    <div class="exp-preview" id="expPreview">// Draw boxes to see coordinates</div>
+    <div class="exp-btns">
+      <button class="btn btn-primary" style="flex:1;justify-content:center;" id="copyBtn" onclick="copyExport()" disabled>Copy</button>
+      <button class="btn" style="flex:1;justify-content:center;" id="jsonDlBtn" onclick="downloadCMSJson()" disabled title="Download CMS JSON file">⬇ Download JSON</button>
+      <button class="btn" style="flex:1;justify-content:center;" id="pdfBtn" onclick="exportPDF()" disabled title="Export as PDF table">📄 PDF</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- Cross-tab clipboard banner -->
+<div class="xtab-banner" id="xtabBanner">
+  <div class="xtab-banner-dot"></div>
+  <div class="xtab-banner-text"><strong id="xtabCount">0</strong> box(es) on cross-tab clipboard — ready to paste</div>
+  <button class="btn btn-primary btn-sm" onclick="pasteFromCrossTab()">📌 Paste to Page…</button>
+  <button class="btn btn-sm" onclick="clearCrossTab()">✕ Clear</button>
+</div>
+
+<!-- Live coords -->
+<div class="live-cur" id="liveCur">X:<span id="lX">0</span> Y:<span id="lY">0</span></div>
+
+<!-- Context menu -->
+<div class="ctx" id="ctxMenu">
+  <div class="ctx-i" onclick="ctxCopy()">📋 Copy Box</div>
+  <div class="ctx-i" onclick="ctxPaste()">📌 Paste Here</div>
+  <div class="ctx-div"></div>
+  <div class="ctx-i" onclick="ctxDuplicate()">⧉ Duplicate</div>
+  <div class="ctx-i" onclick="ctxDuplicateAll()">📑 Duplicate to All Pages</div>
+  <div class="ctx-div"></div>
+  <div class="ctx-i danger" onclick="ctxDelete()">🗑 Delete</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".pdf" onchange="loadPDF(this)">
+<input type="file" id="jsonImportInput" accept=".json" onchange="importJSON(this)">
+
+
+<script src="app.js"></script>
+</body>
+</html>
